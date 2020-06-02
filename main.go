@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"net"
@@ -126,11 +127,21 @@ func handleSigTerm(stats *Statistics) {
 
 // getHostname returns the environment variable or local hostname as a default value
 func getHostname() string {
-	if hostname, ok := os.LookupEnv("DOCKER_HOSTNAME"); ok {
+	hostname, _ := os.Hostname()
+
+	dir, _ := os.Getwd()
+	file, err := os.Open(dir + "/hostname")
+	if err != nil {
+		fmt.Printf("WARN: %s - using '%s'\n", err, hostname)
 		return hostname
 	}
+	defer file.Close()
 
-	hostname, _ := os.Hostname()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		hostname = scanner.Text()
+	}
+
 	return hostname
 }
 
@@ -142,7 +153,7 @@ func getEndpoint() string {
 	}
 
 	// use environment var
-	if endpoint, ok := os.LookupEnv("ENDPOINT"); ok {
+	if endpoint, ok := os.LookupEnv("WATCH_ENDPOINT"); ok {
 		return endpoint
 	}
 
