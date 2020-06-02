@@ -20,8 +20,6 @@ type Statistics struct {
 	Start time.Time `json:"-"`
 }
 
-var min, max, avg float64 = 0, 0, 0
-
 func main() {
 	var endpoint string
 
