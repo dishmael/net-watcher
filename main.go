@@ -1,20 +1,23 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
 	"os/signal"
 	"time"
 
+	influxdb2 "github.com/influxdata/influxdb-client-go"
 	"github.com/tatsushid/go-fastping"
 )
 
 // Statistics ...
 type Statistics struct {
+	Hostname string    `json:"source"`
 	Endpoint string    `json:"endpoint"`
 	Address  string    `json:"address"`
-	Count    int       `json:"count"`
+	Count    int64     `json:"count"`
 	Min      float64   `json:"min"`
 	Max      float64   `json:"max"`
 	Avg      float64   `json:"avg"`
@@ -32,13 +35,25 @@ func main() {
 		Start: time.Now(),
 	}
 
+	// setup a sig handler
 	go handleSigTerm(stats)
 
-	if len(os.Args) < 2 {
-		stats.Endpoint = "www.google.com"
-	} else {
-		stats.Endpoint = os.Args[1]
+	// make sure we are running as root
+	if os.Geteuid() != 0 {
+		fmt.Println("ERROR: net-watcher must be run as root")
+		os.Exit(-1)
 	}
+
+	// determine hostname and endpoint
+	stats.Hostname = getHostname()
+	stats.Endpoint = getEndpoint()
+
+	// create new client with default option for server url authenticate by token
+	client := influxdb2.NewClient("http://masterpi.localdomain:8086", fmt.Sprintf("%s:%s", "admin", "password"))
+	defer client.Close()
+
+	// user blocking write client for writes to desired bucket
+	writeAPI := client.WriteApiBlocking("", "homedb")
 
 	addy, err := net.ResolveIPAddr("ip4:icmp", stats.Endpoint)
 	if err != nil {
@@ -50,9 +65,17 @@ func main() {
 
 	for {
 		ping(stats, addy)
+
+		p := influxdb2.NewPoint("heartbeat",
+			map[string]string{"source": stats.Hostname, "endpoint": stats.Endpoint, "address": stats.Address, "unit": "response_time"},
+			map[string]interface{}{"min": stats.Min, "max": stats.Max, "avg": stats.Avg},
+			time.Now())
+
+		writeAPI.WritePoint(context.Background(), p)
 	}
 }
 
+// ping is the primary worker function
 func ping(stats *Statistics, ip *net.IPAddr) {
 	p := fastping.NewPinger()
 	p.AddIPAddr(ip)
@@ -80,6 +103,7 @@ func ping(stats *Statistics, ip *net.IPAddr) {
 	p.Run()
 }
 
+// handleSigTerm deals with Ctrl+C interrupts
 func handleSigTerm(stats *Statistics) {
 	// Enable the capture of Ctrl-C, to cleanly close the application
 	c := make(chan os.Signal, 1)
@@ -98,4 +122,30 @@ func handleSigTerm(stats *Statistics) {
 	)
 
 	os.Exit(0)
+}
+
+// getHostname returns the environment variable or local hostname as a default value
+func getHostname() string {
+	if hostname, ok := os.LookupEnv("DOCKER_HOSTNAME"); ok {
+		return hostname
+	}
+
+	hostname, _ := os.Hostname()
+	return hostname
+}
+
+// getEndpoint returns the environment variable or a default value
+func getEndpoint() string {
+	// use argument
+	if len(os.Args) > 1 {
+		return os.Args[1]
+	}
+
+	// use environment var
+	if endpoint, ok := os.LookupEnv("ENDPOINT"); ok {
+		return endpoint
+	}
+
+	// use default
+	return "www.google.com"
 }
