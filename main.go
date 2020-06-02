@@ -12,35 +12,35 @@ import (
 
 // Statistics ...
 type Statistics struct {
-	Count int       `json:"count"`
-	Min   float64   `json:"min"`
-	Max   float64   `json:"max"`
-	Avg   float64   `json:"avg"`
-	Value float64   `json:"value"`
-	Start time.Time `json:"-"`
+	Endpoint string    `json:"endpoint"`
+	Count    int       `json:"count"`
+	Min      float64   `json:"min"`
+	Max      float64   `json:"max"`
+	Avg      float64   `json:"avg"`
+	Value    float64   `json:"value"`
+	Start    time.Time `json:"-"`
 }
 
 func main() {
-	var endpoint string
-
 	stats := &Statistics{
-		Count: 0,
-		Max:   0,
-		Min:   0,
-		Avg:   0,
-		Value: 0,
-		Start: time.Now(),
+		Endpoint: "",
+		Count:    0,
+		Max:      0,
+		Min:      0,
+		Avg:      0,
+		Value:    0,
+		Start:    time.Now(),
 	}
 
 	go handleSigTerm(stats)
 
 	if len(os.Args) < 2 {
-		endpoint = "www.google.com"
+		stats.Endpoint = "www.google.com"
 	} else {
-		endpoint = os.Args[1]
+		stats.Endpoint = os.Args[1]
 	}
 
-	addy, err := net.ResolveIPAddr("ip4:icmp", endpoint)
+	addy, err := net.ResolveIPAddr("ip4:icmp", stats.Endpoint)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
