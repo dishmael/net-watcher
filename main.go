@@ -13,6 +13,7 @@ import (
 // Statistics ...
 type Statistics struct {
 	Endpoint string    `json:"endpoint"`
+	Address  string    `json:"address"`
 	Count    int       `json:"count"`
 	Min      float64   `json:"min"`
 	Max      float64   `json:"max"`
@@ -23,13 +24,12 @@ type Statistics struct {
 
 func main() {
 	stats := &Statistics{
-		Endpoint: "",
-		Count:    0,
-		Max:      0,
-		Min:      0,
-		Avg:      0,
-		Value:    0,
-		Start:    time.Now(),
+		Count: 0,
+		Max:   0,
+		Min:   0,
+		Avg:   0,
+		Value: 0,
+		Start: time.Now(),
 	}
 
 	go handleSigTerm(stats)
@@ -45,6 +45,8 @@ func main() {
 		fmt.Println(err)
 		os.Exit(-1)
 	}
+
+	stats.Address = addy.String()
 
 	for {
 		ping(stats, addy)
