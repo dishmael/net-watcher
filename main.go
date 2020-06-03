@@ -69,7 +69,7 @@ func main() {
 
 		p := influxdb2.NewPoint("heartbeat",
 			map[string]string{"source": stats.Hostname, "endpoint": stats.Endpoint, "address": stats.Address, "unit": "response_time"},
-			map[string]interface{}{"min": stats.Min, "max": stats.Max, "avg": stats.Avg},
+			map[string]interface{}{"rtt": stats.Value},
 			time.Now())
 
 		writeAPI.WritePoint(context.Background(), p)
@@ -97,7 +97,8 @@ func ping(stats *Statistics, ip *net.IPAddr) {
 		// Calc Avg
 		stats.Avg = (stats.Avg + stats.Value) / 2
 
-		fmt.Printf("IP Addr: %s receive, RTT: %.3f \n", addr.String(), stats.Value)
+		fmt.Printf("Endpoint: %s, IP Addr: %s, RTT: %.3f \n",
+			stats.Endpoint, addr.String(), stats.Value)
 	}
 
 	stats.Count++
@@ -115,11 +116,7 @@ func handleSigTerm(stats *Statistics) {
 
 	fmt.Printf("\r")
 	fmt.Printf("\r----\nStatistics: elapsed=%s count=%d min=%.3f max=%.3f avg=%.3f\n\n",
-		elapsed,
-		stats.Count,
-		stats.Min,
-		stats.Max,
-		stats.Avg,
+		elapsed, stats.Count, stats.Min, stats.Max, stats.Avg,
 	)
 
 	os.Exit(0)
@@ -129,6 +126,7 @@ func handleSigTerm(stats *Statistics) {
 func getHostname() string {
 	hostname, _ := os.Hostname()
 
+	// open file 'hostname'
 	dir, _ := os.Getwd()
 	file, err := os.Open(dir + "/hostname")
 	if err != nil {
@@ -137,11 +135,13 @@ func getHostname() string {
 	}
 	defer file.Close()
 
+	// read file 'hostname'
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		hostname = scanner.Text()
 		if len(hostname) == 0 {
-			hostname, _ = os.Hostname()
+			hostname, _ := os.Hostname()
+			fmt.Printf("WARN: hostname file was empty, using '%s'", hostname)
 		}
 	}
 
