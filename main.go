@@ -140,6 +140,9 @@ func getHostname() string {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		hostname = scanner.Text()
+		if len(hostname) == 0 {
+			hostname, _ = os.Hostname()
+		}
 	}
 
 	return hostname
